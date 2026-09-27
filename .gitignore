@@ -1,10 +1,4 @@
-# Terraform
+*.tfvars
 .terraform/
-
-# Terraform state files
 *.tfstate
 *.tfstate.*
-
-# Sensitive variable files
-# Uncomment if you don't want terraform.tfvars in GitHub
-# *.tfvars

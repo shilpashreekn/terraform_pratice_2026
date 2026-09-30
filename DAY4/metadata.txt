@@ -1,0 +1,293 @@
+Terraform Modules + Multi-Region + Apache2/HTTPD
+1. Terraform Modules
+
+A module is a reusable collection of Terraform resources.
+
+Example:
+
+DAY5/
+├── main.tf
+├── provider.tf
+├── variables.tf
+├── terraform.tfvars
+└── modules/
+    ├── apache/
+    │   ├── main.tf
+    │   ├── variables.tf
+    │   └── outputs.tf
+    └── httpd/
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+
+The root main.tf calls the child modules:
+
+module "apache" {
+  source = "./modules/apache"
+}
+
+module "httpd" {
+  source = "./modules/httpd"
+}
+
+Important: source points to the module folder, not main.tf.
+
+2. Multi-Region Providers
+
+We can create multiple AWS provider configurations using aliases.
+
+provider "aws" {
+  alias  = "mumbai"
+  region = var.aws_region_mumbai
+}
+
+provider "aws" {
+  alias  = "sydney"
+  region = var.aws_region_sydney
+}
+
+Example terraform.tfvars:
+
+aws_region_mumbai = "ap-south-1"
+aws_region_sydney = "ap-southeast-2"
+3. Passing Providers to Modules
+
+We can decide which region each module uses.
+
+Apache → Mumbai
+module "apache" {
+  source = "./modules/apache"
+
+  providers = {
+    aws = aws.mumbai
+  }
+}
+HTTPD → Sydney
+module "httpd" {
+  source = "./modules/httpd"
+
+  providers = {
+    aws = aws.sydney
+  }
+}
+
+So:
+
+Terraform
+   │
+   ├── Apache module
+   │      └── Mumbai
+   │          ap-south-1
+   │
+   └── HTTPD module
+          └── Sydney
+              ap-southeast-2
+4. Apache2 vs HTTPD
+
+Both are web servers, but the installation command depends on the Linux OS.
+
+Server	Typical OS	Package manager	Package
+Apache2	Ubuntu/Debian	apt	apache2
+HTTPD	Amazon Linux/RHEL/CentOS	yum/dnf	httpd
+Ubuntu + Apache2
+apt update -y
+apt install apache2 -y
+systemctl start apache2
+systemctl enable apache2
+Amazon Linux + HTTPD
+yum update -y
+yum install httpd -y
+systemctl start httpd
+systemctl enable httpd
+
+For Amazon Linux 2023, dnf is preferred:
+
+dnf install httpd -y
+5. Terraform user_data
+
+user_data runs commands automatically when the EC2 instance starts for the first time.
+
+Apache2 / Ubuntu
+user_data = <<-EOF
+  #!/bin/bash
+
+  apt update -y
+  apt install apache2 -y
+
+  systemctl start apache2
+  systemctl enable apache2
+
+  echo "<h1>Welcome to My Apache2 Server</h1>" > /var/www/html/index.html
+  echo "<p>Created using Terraform.</p>" >> /var/www/html/index.html
+EOF
+HTTPD / Amazon Linux
+user_data = <<-EOF
+  #!/bin/bash
+
+  yum update -y
+  yum install httpd -y
+
+  systemctl start httpd
+  systemctl enable httpd
+
+  echo "<h1>Welcome to My HTTPD Server</h1>" > /var/www/html/index.html
+  echo "<p>Created using Terraform.</p>" >> /var/www/html/index.html
+EOF
+6. Security Group
+
+To access the website from a browser, the EC2 Security Group needs to allow HTTP port 80.
+
+resource "aws_security_group" "apache_sg" {
+
+  name = "apache_sg"
+
+  ingress {
+    description = "Allow HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+
+Then attach it to the EC2:
+
+vpc_security_group_ids = [aws_security_group.apache_sg.id]
+
+Same concept for HTTPD:
+
+vpc_security_group_ids = [aws_security_group.httpd_sg.id]
+Why attach the Security Group?
+
+Creating a Security Group alone is not enough.
+
+The EC2 instance must actually use it:
+
+Security Group
+      │
+      │ port 80
+      ▼
+    EC2
+      │
+      ▼
+ Apache2 / HTTPD
+      │
+      ▼
+ Web Browser
+7. Different AMIs for Different Regions
+
+AMI IDs are region-specific.
+
+For example:
+
+Mumbai
+ap-south-1
+   └── Ubuntu AMI → Apache2
+
+Sydney
+ap-southeast-2
+   └── Amazon Linux AMI → HTTPD
+
+Don't assume an AMI ID that works in Mumbai will work in Sydney.
+
+Also, the OS must match the commands in user_data.
+
+Ubuntu
+  ↓
+apt
+  ↓
+apache2
+
+Amazon Linux
+  ↓
+yum/dnf
+  ↓
+httpd
+8. Useful Terraform Commands
+terraform init
+
+Initializes Terraform and downloads providers.
+
+terraform validate
+
+Checks Terraform syntax/configuration.
+
+terraform plan
+
+Shows what Terraform wants to change.
+
+terraform apply
+
+Creates or updates infrastructure.
+
+terraform output
+
+Shows output values such as public IPs.
+
+terraform destroy
+
+Deletes infrastructure created by the Terraform configuration.
+
+Since your Terraform executable is installed at C:\terraform, you can use:
+
+C:\terraform\terraform.exe plan
+
+etc.
+
+9. Key Things to Remember
+MODULE
+→ Reusable Terraform code
+
+PROVIDER ALIAS
+→ Allows different AWS configurations/regions
+
+MODULE PROVIDER
+→ Decides which provider/region the module uses
+
+AMI
+→ OS image; AMIs are region-specific
+
+USER_DATA
+→ Automatically runs setup commands on EC2
+
+APACHE2
+→ Ubuntu/Debian
+→ apt
+→ apache2
+
+HTTPD
+→ Amazon Linux/RHEL/CentOS
+→ yum/dnf
+→ httpd
+
+SECURITY GROUP
+→ Controls network traffic
+
+PORT 80
+→ HTTP web traffic
+Your current practice
+             Terraform
+                 │
+       ┌─────────┴─────────┐
+       │                   │
+   Apache module       HTTPD module
+       │                   │
+    Mumbai              Sydney
+  ap-south-1          ap-southeast-2
+       │                   │
+    Ubuntu             Amazon Linux
+       │                   │
+     apt                 yum
+       │                   │
+   apache2               httpd
+       │                   │
+     :80                  :80
+
+This is a very useful beginner Terraform exercise because it combines modules + variables + outputs + provider aliases + multi-region + EC2 + Security Groups + user_data in one project.

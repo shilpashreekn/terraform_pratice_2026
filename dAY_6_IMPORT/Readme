@@ -1,0 +1,288 @@
+Terraform Day 6 — Import & State
+1. What is Terraform Import?
+
+Terraform Import is used when an infrastructure resource already exists in AWS, but it was created outside Terraform.
+
+Example:
+
+AWS Console
+    ↓
+Existing EC2
+    ↓
+Terraform Import
+    ↓
+Terraform State
+    ↓
+Terraform manages the EC2
+Example
+
+Existing AWS EC2:
+
+i-0d1c78c43b61d8eda
+
+Terraform doesn't initially know about it.
+
+We import it using:
+
+import {
+  id = "i-0d1c78c43b61d8eda"
+  to = aws_instance.example
+}
+2. Resource Block
+
+The destination resource must exist in Terraform configuration:
+
+resource "aws_instance" "example" {
+}
+
+The to value in the import block must match the resource address:
+
+import.to
+    ↓
+aws_instance.example
+
+resource
+    ↓
+aws_instance.example
+3. Provider Configuration
+
+For our example, the EC2 was in Sydney:
+
+provider "aws" {
+  region = "ap-southeast-2"
+}
+4. Import Block
+
+Modern Terraform supports the declarative import block:
+
+import {
+  id = "i-0d1c78c43b61d8eda"
+  to = aws_instance.example
+}
+id
+
+The actual ID of the existing AWS resource:
+
+id = "i-0d1c78c43b61d8eda"
+to
+
+The Terraform resource address:
+
+to = aws_instance.example
+5. Generate Terraform Configuration
+
+Terraform can generate a starting configuration for an existing resource.
+
+Command:
+
+terraform plan -generate-config-out="generated.tf"
+
+Terraform creates:
+
+generated.tf
+
+The generated file can contain attributes such as:
+
+resource "aws_instance" "example" {
+  ami           = "ami-xxxxxxxx"
+  instance_type = "t2.micro"
+  subnet_id     = "subnet-xxxxxxxx"
+
+  tags = {
+    Name = "terraform-import-test"
+  }
+}
+
+The exact configuration depends on the existing AWS resource.
+
+⚠️ Important
+
+Generated configuration should be reviewed manually.
+
+It can contain conflicting arguments.
+
+For example, we encountered:
+
+primary_network_interface
+        VS
+associate_public_ip_address
+
+and:
+
+ipv6_address_count
+        VS
+ipv6_addresses
+
+These conflicts need to be removed/fixed before Terraform can validate the configuration.
+
+6. Terraform State File
+
+Terraform uses a state file to keep track of infrastructure.
+
+Default file:
+
+terraform.tfstate
+
+Think of it like:
+
+Terraform code
+     ↓
+What I WANT
+
+terraform.tfstate
+     ↓
+What Terraform KNOWS exists
+
+Terraform creates/updates the state during infrastructure operations such as:
+
+terraform apply
+
+For an imported resource, Terraform records the relationship:
+
+aws_instance.example
+        ↓
+i-0d1c78c43b61d8eda
+
+inside the state.
+
+7. Check Resources in State
+
+List resources:
+
+terraform state list
+
+Example:
+
+aws_instance.example
+
+View complete information:
+
+terraform state show aws_instance.example
+
+This allows you to inspect the attributes Terraform knows about the imported EC2.
+
+8. Terraform Commands for Import Practice
+Initialize
+terraform init
+Generate configuration
+terraform plan -generate-config-out="generated.tf"
+Format
+terraform fmt
+Validate
+terraform validate
+
+Expected:
+
+Success! The configuration is valid.
+Check planned changes
+terraform plan
+Apply
+terraform apply
+Check state
+terraform state list
+Inspect resource
+terraform state show aws_instance.example
+9. Import Flow ⭐
+
+Remember this flow for interviews:
+
+        Existing AWS Resource
+                 ↓
+        Create Terraform Resource
+                 ↓
+          Create import block
+                 ↓
+ terraform plan -generate-config-out
+                 ↓
+        generated.tf created
+                 ↓
+       Review generated code
+                 ↓
+        Fix any conflicts
+                 ↓
+          terraform fmt
+                 ↓
+        terraform validate
+                 ↓
+          terraform plan
+                 ↓
+          terraform apply
+                 ↓
+        terraform.tfstate
+10. .tf vs .tfstate
+File	Purpose
+main.tf	Terraform configuration
+generated.tf	Generated configuration
+terraform.tfvars	Variable values
+.terraform.lock.hcl	Provider version lock
+terraform.tfstate	Terraform's state/record of infrastructure
+.terraform/	Downloaded Terraform providers and working data
+11. What NOT to Push to GitHub 🚨
+
+Don't push:
+
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+
+Your .gitignore should contain:
+
+.terraform/
+*.tfstate
+*.tfstate.*
+
+You can normally commit:
+
+main.tf
+generated.tf
+variables.tf
+outputs.tf
+terraform.tfvars
+.terraform.lock.hcl
+module/
+
+But only commit terraform.tfvars if it contains no secrets.
+
+12. Import vs Generate Configuration
+
+This is an important distinction:
+
+Import
+AWS resource
+     ↓
+Terraform STATE
+
+Import makes Terraform aware of the existing resource.
+
+Generate configuration
+AWS resource/state information
+     ↓
+generated.tf
+
+It helps create Terraform code representing the existing resource.
+
+So:
+
+Import brings the resource into Terraform's state; configuration generation helps create the Terraform code.
+
+🎯 Interview Answer
+
+If someone asks:
+
+"How do you import an existing EC2 into Terraform?"
+
+You can answer:
+
+I first define the AWS provider and a Terraform resource address. Then I use an import block with the existing EC2 instance ID and the Terraform resource address. I can use terraform plan -generate-config-out to generate a starting configuration, review and fix any conflicting attributes, then run terraform fmt, terraform validate, and terraform plan. Terraform maintains the imported resource information in the state file.
+
+⭐ Commands to remember
+terraform init
+terraform plan -generate-config-out="generated.tf"
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+terraform state list
+terraform state show aws_instance.example
+
+This is your Day 6 Terraform Import + State revision sheet.

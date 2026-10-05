@@ -1,0 +1,1189 @@
+1. What is Terraform Import?
+
+Terraform Import is used when an infrastructure resource already exists in AWS, but it was created outside Terraform.
+
+Example:
+
+AWS Console
+    ↓
+Existing EC2
+    ↓
+Terraform Import
+    ↓
+Terraform State
+    ↓
+Terraform manages the EC2
+Example
+
+Existing AWS EC2:
+
+i-0d1c78c43b61d8eda
+
+Terraform doesn't initially know about it.
+
+We import it using:
+
+import {
+  id = "i-0d1c78c43b61d8eda"
+  to = aws_instance.example
+}
+2. Resource Block
+
+The destination resource must exist in Terraform configuration:
+
+resource "aws_instance" "example" {
+}
+
+The to value in the import block must match the resource address:
+
+import.to
+    ↓
+aws_instance.example
+
+resource
+    ↓
+aws_instance.example
+3. Provider Configuration
+
+For our example, the EC2 was in Sydney:
+
+provider "aws" {
+  region = "ap-southeast-2"
+}
+4. Import Block
+
+Modern Terraform supports the declarative import block:
+
+import {
+  id = "i-0d1c78c43b61d8eda"
+  to = aws_instance.example
+}
+id
+
+The actual ID of the existing AWS resource:
+
+id = "i-0d1c78c43b61d8eda"
+to
+
+The Terraform resource address:
+
+to = aws_instance.example
+5. Generate Terraform Configuration
+
+Terraform can generate a starting configuration for an existing resource.
+
+Command:
+
+terraform plan -generate-config-out="generated.tf"
+
+Terraform creates:
+
+generated.tf
+
+The generated file can contain attributes such as:
+
+resource "aws_instance" "example" {
+  ami           = "ami-xxxxxxxx"
+  instance_type = "t2.micro"
+  subnet_id     = "subnet-xxxxxxxx"
+
+  tags = {
+    Name = "terraform-import-test"
+  }
+}
+
+The exact configuration depends on the existing AWS resource.
+
+⚠️ Important
+
+Generated configuration should be reviewed manually.
+
+It can contain conflicting arguments.
+
+For example, we encountered:
+
+primary_network_interface
+        VS
+associate_public_ip_address
+
+and:
+
+ipv6_address_count
+        VS
+ipv6_addresses
+
+These conflicts need to be removed/fixed before Terraform can validate the configuration.
+
+6. Terraform State File
+
+Terraform uses a state file to keep track of infrastructure.
+
+Default file:
+
+terraform.tfstate
+
+Think of it like:
+
+Terraform code
+     ↓
+What I WANT
+
+terraform.tfstate
+     ↓
+What Terraform KNOWS exists
+
+Terraform creates/updates the state during infrastructure operations such as:
+
+terraform apply
+
+For an imported resource, Terraform records the relationship:
+
+aws_instance.example
+        ↓
+i-0d1c78c43b61d8eda
+
+inside the state.
+
+7. Check Resources in State
+
+List resources:
+
+terraform state list
+
+Example:
+
+aws_instance.example
+
+View complete information:
+
+terraform state show aws_instance.example
+
+This allows you to inspect the attributes Terraform knows about the imported EC2.
+
+8. Terraform Commands for Import Practice
+Initialize
+terraform init
+Generate configuration
+terraform plan -generate-config-out="generated.tf"
+Format
+terraform fmt
+Validate
+terraform validate
+
+Expected:
+
+Success! The configuration is valid.
+Check planned changes
+terraform plan
+Apply
+terraform apply
+Check state
+terraform state list
+Inspect resource
+terraform state show aws_instance.example
+9. Import Flow ⭐
+
+Remember this flow for interviews:
+
+        Existing AWS Resource
+                 ↓
+        Create Terraform Resource
+                 ↓
+          Create import block
+                 ↓
+ terraform plan -generate-config-out
+                 ↓
+        generated.tf created
+                 ↓
+       Review generated code
+                 ↓
+        Fix any conflicts
+                 ↓
+          terraform fmt
+                 ↓
+        terraform validate
+                 ↓
+          terraform plan
+                 ↓
+          terraform apply
+                 ↓
+        terraform.tfstate
+10. .tf vs .tfstate
+File	Purpose
+main.tf	Terraform configuration
+generated.tf	Generated configuration
+terraform.tfvars	Variable values
+.terraform.lock.hcl	Provider version lock
+terraform.tfstate	Terraform's state/record of infrastructure
+.terraform/	Downloaded Terraform providers and working data
+11. What NOT to Push to GitHub 🚨
+
+Don't push:
+
+.terraform/
+terraform.tfstate
+terraform.tfstate.*
+
+Your .gitignore should contain:
+
+.terraform/
+*.tfstate
+*.tfstate.*
+
+You can normally commit:
+
+main.tf
+generated.tf
+variables.tf
+outputs.tf
+terraform.tfvars
+.terraform.lock.hcl
+module/
+
+But only commit terraform.tfvars if it contains no secrets.
+
+12. Import vs Generate Configuration
+
+This is an important distinction:
+
+Import
+AWS resource
+     ↓
+Terraform STATE
+
+Import makes Terraform aware of the existing resource.
+
+Generate configuration
+AWS resource/state information
+     ↓
+generated.tf
+
+It helps create Terraform code representing the existing resource.
+
+So:
+
+Import brings the resource into Terraform's state; configuration generation helps create the Terraform code.
+
+🎯 Interview Answer
+
+If someone asks:
+
+"How do you import an existing EC2 into Terraform?"
+
+You can answer:
+
+I first define the AWS provider and a Terraform resource address. Then I use an import block with the existing EC2 instance ID and the Terraform resource address. I can use terraform plan -generate-config-out to generate a starting configuration, review and fix any conflicting attributes, then run terraform fmt, terraform validate, and terraform plan. Terraform maintains the imported resource information in the state file.
+
+⭐ Commands to remember
+terraform init
+terraform plan -generate-config-out="generated.tf"
+terraform fmt
+terraform validate
+terraform plan
+terraform apply
+terraform state list
+terraform state show aws_instance.example
+
+This is your Day 6 Terraform Import + State revision sheet.
+
+so give total terraform notes which i pratice from starting i will as notes for my interview
+
+Absolutely. Based on what you've practiced with me from the beginning, I'll organize this as your Terraform Interview Notes rather than generic Terraform documentation.
+
+Terraform Interview Notes — Your Practice
+1. What is Terraform?
+
+Terraform is an Infrastructure as Code (IaC) tool developed by HashiCorp.
+
+It allows us to define infrastructure using configuration files and create/manage resources such as:
+
+EC2
+VPC
+Subnets
+Security Groups
+Load Balancers
+S3
+IAM
+RDS
+CloudFront
+Route 53
+
+Terraform uses a declarative approach.
+
+Declarative means
+
+We tell Terraform what we want, not every step required to create it.
+
+Example:
+
+resource "aws_instance" "web" {
+  ami           = var.ami_id
+  instance_type = "t2.micro"
+}
+
+Terraform determines how to create it.
+
+2. Terraform Architecture
+
+Basic flow:
+
+Terraform Configuration
+        ↓
+Terraform CLI
+        ↓
+AWS Provider
+        ↓
+AWS API
+        ↓
+AWS Infrastructure
+
+Terraform has three important components:
+
+Configuration
+
+.tf files define desired infrastructure.
+
+Provider
+
+Connects Terraform to AWS.
+
+provider "aws" {
+  region = "ap-south-1"
+}
+State
+
+Terraform records infrastructure information in:
+
+terraform.tfstate
+3. Terraform Files
+
+Common Terraform files:
+
+File	Purpose
+main.tf	Main resources
+variables.tf	Variable declarations
+terraform.tfvars	Variable values
+outputs.tf	Output values
+providers.tf	Provider configuration
+versions.tf	Terraform/provider requirements
+.terraform.lock.hcl	Locks provider versions
+terraform.tfstate	Infrastructure state
+4. Terraform Installation
+
+Check Terraform:
+
+terraform version
+
+You practiced with:
+
+Terraform v1.16.4
+windows_amd64
+
+If Terraform isn't in PATH, you can execute it using its full path, for example:
+
+C:\terraform\terraform.exe version
+5. Terraform Provider
+
+Provider tells Terraform which platform/API to communicate with.
+
+Example AWS:
+
+provider "aws" {
+  region = "ap-south-1"
+}
+
+Initialize provider:
+
+terraform init
+6. Terraform init
+terraform init
+Purpose
+Initializes Terraform working directory
+Downloads providers
+Initializes modules
+Creates .terraform
+Creates/updates .terraform.lock.hcl
+
+Typical flow:
+
+terraform init
+      ↓
+Download AWS provider
+      ↓
+Initialize modules
+      ↓
+Ready for plan/apply
+7. Terraform plan
+terraform plan
+
+Shows what Terraform plans to change.
+
+Possible actions:
+
++ create
+~ update
+- destroy
+-/+ replace
+Important interview point
+
+terraform plan does not create infrastructure.
+
+It only shows the proposed changes.
+
+8. Terraform apply
+terraform apply
+
+Creates/updates infrastructure according to the plan.
+
+Usually:
+
+terraform plan
+        ↓
+Review
+        ↓
+terraform apply
+9. Terraform destroy
+terraform destroy
+
+Destroys resources managed by Terraform.
+
+⚠️ Always review the destruction plan carefully.
+
+10. Terraform Format
+terraform fmt
+
+Formats Terraform files according to Terraform's standard formatting.
+
+11. Terraform Validate
+terraform validate
+
+Checks whether the Terraform configuration is syntactically and structurally valid.
+
+Example:
+
+Success! The configuration is valid.
+12. Variables
+
+Instead of hardcoding values:
+
+instance_type = "t2.micro"
+
+we can use variables:
+
+instance_type = var.instance_type
+
+Declare:
+
+variable "instance_type" {
+  type = string
+}
+
+Set value in:
+
+instance_type = "t2.micro"
+
+inside terraform.tfvars.
+
+Flow
+variables.tf
+     ↓
+terraform.tfvars
+     ↓
+var.instance_type
+     ↓
+resource
+13. Variable Types
+
+Common types:
+
+string
+number
+bool
+list
+map
+set
+object
+
+Example:
+
+variable "instance_type" {
+  type    = string
+  default = "t2.micro"
+}
+14. Terraform Outputs
+
+Outputs expose useful information after deployment.
+
+Example:
+
+output "instance_id" {
+  value = aws_instance.web.id
+}
+
+Run:
+
+terraform output
+15. Resource
+
+Resource defines infrastructure.
+
+Example:
+
+resource "aws_instance" "web" {
+  ami           = var.ami
+  instance_type = var.instance_type
+}
+
+Format:
+
+resource "<provider>_<resource>" "<local_name>"
+
+Example:
+
+aws_instance.web
+16. Resource Arguments vs Attributes
+
+Example:
+
+resource "aws_instance" "web" {
+  ami           = var.ami
+  instance_type = "t2.micro"
+}
+
+ami and instance_type are arguments.
+
+After creation, things like:
+
+aws_instance.web.id
+aws_instance.web.public_ip
+
+are attributes.
+
+17. References
+
+Terraform resources can reference other resources.
+
+Example:
+
+subnet_id = aws_subnet.public.id
+
+Terraform automatically understands the dependency.
+
+18. Dependency
+
+Terraform creates resources in the required order when references establish dependencies.
+
+Example:
+
+VPC
+ ↓
+Subnet
+ ↓
+EC2
+
+Terraform understands:
+
+subnet_id = aws_subnet.public.id
+
+and creates the subnet before the EC2.
+
+19. Explicit Dependency
+
+Sometimes we use:
+
+depends_on = [
+  aws_instance.example
+]
+
+Use depends_on when Terraform cannot automatically determine the dependency.
+
+20. Terraform State
+
+The default state file is:
+
+terraform.tfstate
+
+It records Terraform's knowledge of infrastructure.
+
+Think:
+
+.tf files
+   ↓
+Desired configuration
+
+terraform.tfstate
+   ↓
+Terraform's record of managed infrastructure
+View resources
+terraform state list
+View specific resource
+terraform state show aws_instance.example
+21. Why State Is Important
+
+Terraform uses state to determine:
+
+What exists?
+What changed?
+What needs to be created?
+What needs to be updated?
+What needs to be destroyed?
+
+Without proper state management, Terraform cannot reliably manage infrastructure.
+
+22. Never Commit Local State to Git
+
+Don't push:
+
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+
+Your .gitignore should contain:
+
+.terraform/
+*.tfstate
+*.tfstate.*
+
+For team environments, state should generally be stored remotely.
+
+23. Terraform Modules
+
+You practiced modules extensively.
+
+A module is a reusable collection of Terraform configuration.
+
+Example:
+
+project/
+│
+├── main.tf
+│
+└── module/
+    └── ec2_instance/
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+
+Call the module:
+
+module "ec2_instance" {
+  source = "./module/ec2_instance"
+
+  ami           = var.ami
+  instance_type = var.instance_type
+  instance_name = var.instance_name
+}
+24. Why Modules?
+
+Modules provide:
+
+Reusability
+Cleaner code
+Standardization
+Easier maintenance
+Separation of infrastructure components
+
+Interview answer:
+
+A module is a reusable and encapsulated collection of Terraform resources that helps us avoid duplicating infrastructure code.
+
+25. Module Variables
+
+Parent:
+
+module "ec2_instance" {
+  source = "./module/ec2_instance"
+
+  ami           = var.ami
+  instance_type = var.instance_type
+  instance_name = var.instance_name
+}
+
+Child module:
+
+variable "ami" {
+  type = string
+}
+
+The argument name passed by the parent must match the variable declared by the child module.
+
+26. Terraform Modules — Your Practice
+
+You practiced an EC2 module like:
+
+root module
+    ↓
+EC2 module
+    ↓
+aws_instance
+
+You also practiced outputs such as:
+
+instance ID
+public IP
+private IP
+subnet ID
+27. Multiple AWS Regions
+
+You practiced deploying resources in different AWS regions.
+
+Example:
+
+provider "aws" {
+  alias  = "mumbai"
+  region = "ap-south-1"
+}
+
+provider "aws" {
+  alias  = "sydney"
+  region = "ap-southeast-2"
+}
+
+Use provider alias:
+
+resource "aws_instance" "sydney" {
+  provider = aws.sydney
+
+  ami           = var.ami
+  instance_type = "t2.micro"
+}
+Important
+
+Default provider:
+
+provider "aws" {
+  region = "ap-south-1"
+}
+
+Aliased provider:
+
+provider "aws" {
+  alias  = "sydney"
+  region = "ap-southeast-2"
+}
+28. Terraform Workspaces
+
+You practiced Terraform Workspaces as Day 5.
+
+List:
+
+terraform workspace list
+
+Current workspace:
+
+terraform workspace show
+
+Create:
+
+terraform workspace new dev
+
+Create another:
+
+terraform workspace new prod
+
+Switch:
+
+terraform workspace select dev
+
+or:
+
+terraform workspace select prod
+
+Delete:
+
+terraform workspace delete dev
+29. terraform.workspace
+
+Terraform exposes the current workspace through:
+
+terraform.workspace
+
+Example:
+
+tags = {
+  Name = "${terraform.workspace}-server"
+}
+
+In dev:
+
+dev-server
+
+In prod:
+
+prod-server
+30. Workspace Concept
+
+Same Terraform configuration:
+
+                Terraform Code
+                     │
+             ┌───────┴───────┐
+             ↓               ↓
+            dev             prod
+             ↓               ↓
+        dev state        prod state
+             ↓               ↓
+        Dev resources    Prod resources
+
+Workspaces are useful when you want separate state for different environments using similar configuration.
+
+31. Terraform Import
+
+You practiced importing an existing EC2.
+
+Import is used when:
+
+AWS resource already exists
+        ↓
+Terraform doesn't manage it
+        ↓
+Import it
+        ↓
+Terraform manages it
+
+Modern syntax:
+
+import {
+  id = "i-xxxxxxxx"
+  to = aws_instance.example
+}
+
+And destination:
+
+resource "aws_instance" "example" {
+}
+32. Generate Configuration During Import
+
+You practiced:
+
+terraform plan -generate-config-out="generated.tf"
+
+Terraform can generate a starting configuration based on the existing resource.
+
+But always review generated configuration.
+
+We encountered conflicting attributes such as:
+
+primary_network_interface
+vs
+associate_public_ip_address
+
+and:
+
+ipv6_address_count
+vs
+ipv6_addresses
+
+Generated code may need manual cleanup.
+
+33. Import vs Configuration
+
+Very important interview question.
+
+Import
+
+Brings the existing resource into:
+
+Terraform State
+Configuration generation
+
+Helps create:
+
+Terraform .tf configuration
+
+Therefore:
+
+Import is about bringing an existing resource under Terraform state management; generated configuration helps represent that resource in Terraform code.
+
+34. Terraform Lifecycle
+
+Terraform lifecycle meta-argument:
+
+lifecycle {
+  prevent_destroy = true
+}
+
+Other important options:
+
+create_before_destroy = true
+
+and:
+
+ignore_changes = [
+  tags
+]
+prevent_destroy
+
+Prevents accidental destruction.
+
+create_before_destroy
+
+Creates the replacement before destroying the old resource when possible.
+
+ignore_changes
+
+Tells Terraform to ignore changes to specified attributes.
+
+35. Terraform Data Sources
+
+Data sources retrieve existing information instead of creating resources.
+
+Example:
+
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+
+  owners = ["amazon"]
+}
+
+Then:
+
+ami = data.aws_ami.amazon_linux.id
+
+Difference:
+
+resource → creates/manages infrastructure
+
+data → reads existing information
+36. Terraform .terraform.lock.hcl
+
+Terraform creates:
+
+.terraform.lock.hcl
+
+It records selected provider versions/checksums.
+
+Example:
+
+AWS provider
+↓
+version selection
+↓
+lock file
+
+Unlike .terraform/ and state files, the lock file is normally committed to Git.
+
+37. .terraform Directory
+
+Terraform creates:
+
+.terraform/
+
+It contains Terraform working data and downloaded providers/modules.
+
+Usually:
+
+.terraform/
+
+Do not commit it.
+
+38. Terraform Git Workflow
+
+Your practice workflow:
+
+Terraform code
+      ↓
+terraform fmt
+      ↓
+terraform validate
+      ↓
+terraform plan
+      ↓
+terraform apply
+      ↓
+Git add
+      ↓
+Git commit
+      ↓
+Git push
+
+Example:
+
+git status
+git add .
+git commit -m "Add Terraform practice"
+git push origin master
+39. Git + Terraform .gitignore
+
+Recommended:
+
+.terraform/
+*.tfstate
+*.tfstate.*
+
+Be careful with:
+
+terraform.tfvars
+
+Don't commit it if it contains:
+
+AWS access keys
+passwords
+tokens
+secrets
+40. Terraform Directory Structure
+
+A clean project can look like:
+
+terraform-project/
+│
+├── main.tf
+├── variables.tf
+├── outputs.tf
+├── providers.tf
+├── terraform.tfvars
+├── .terraform.lock.hcl
+│
+└── modules/
+    └── ec2/
+        ├── main.tf
+        ├── variables.tf
+        └── outputs.tf
+41. Terraform Command Cheat Sheet ⭐
+Initialization
+terraform init
+Format
+terraform fmt
+Validate
+terraform validate
+Plan
+terraform plan
+Apply
+terraform apply
+Destroy
+terraform destroy
+Show state
+terraform show
+List state resources
+terraform state list
+Inspect resource
+terraform state show aws_instance.example
+Outputs
+terraform output
+Workspace
+terraform workspace list
+terraform workspace show
+terraform workspace new dev
+terraform workspace select dev
+terraform workspace delete dev
+Import configuration generation
+terraform plan -generate-config-out="generated.tf"
+42. Your Terraform Learning Progress
+
+Based on the practice we've done, your current progression is roughly:
+
+Day 1
+│
+├── Terraform basics
+├── Provider
+├── Resources
+├── Variables
+└── EC2
+│
+Day 2
+│
+├── Multiple AWS regions
+└── Provider aliases
+│
+Day 3
+│
+├── Modules
+├── Module variables
+└── Module outputs
+│
+Day 4
+│
+├── Multiple modules
+├── Apache/httpd
+├── Different regions
+└── User data / Security Groups
+│
+Day 5
+│
+└── Terraform Workspaces
+│
+Day 6
+│
+├── Terraform Import
+├── Import blocks
+├── Generate configuration
+└── Terraform State
+🎯 Most Important Interview Questions
+
+You should be able to answer these confidently:
+
+Beginner
+
+What is Terraform?
+
+Terraform is an Infrastructure as Code tool used to provision and manage infrastructure using declarative configuration.
+
+What is a provider?
+
+A provider is a plugin that allows Terraform to interact with a particular platform or service such as AWS.
+
+What is terraform init?
+
+It initializes the working directory, downloads providers/modules, and prepares Terraform for use.
+
+Difference between plan and apply?
+
+Plan previews changes; apply executes those changes.
+
+Intermediate
+
+What is Terraform state?
+
+State is Terraform's record of the infrastructure it manages and is used to map Terraform configuration to real resources.
+
+Why do we use modules?
+
+Modules provide reusable, organized infrastructure code and reduce duplication.
+
+What are workspaces?
+
+Workspaces allow the same Terraform configuration to use separate state instances, commonly for environments such as dev and prod.
+
+What is provider alias?
+
+A provider alias allows multiple configurations of the same provider, such as deploying resources into different AWS regions.
+
+Import
+
+What is Terraform import?
+
+Import brings an existing resource created outside Terraform into Terraform's state so Terraform can manage it.
+
+Does import automatically create Terraform code?
+
+Traditional import primarily updates state. With modern Terraform, -generate-config-out can generate starting configuration, but the generated code still needs review.
+
+⭐ The Terraform Mental Model
+
+If you remember only one diagram for your interview, remember this:
+
+             Terraform .tf files
+                     │
+                     ↓
+              terraform plan
+                     │
+                     ↓
+             Compare with State
+                     │
+              ┌──────┴──────┐
+              ↓             ↓
+         No difference    Difference
+              │             │
+              │             ↓
+              │        terraform apply
+              │             │
+              │             ↓
+              │        AWS resources
+              │             │
+              └─────────────┘
+                     ↓
+              terraform.tfstate
+
+And the overall concept:
+
+Terraform configuration describes the desired infrastructure, the provider communicates with AWS, Terraform state tracks managed infrastructure, plan determines differences, and apply makes the required changes.
